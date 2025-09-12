@@ -7,8 +7,8 @@ const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 const chatUserAvatar = document.getElementById('chat-user-avatar');
 const chatUsernameEl = document.getElementById('chat-username');
-const chatPhotoInput = document.getElementById('chat-photo-input');
-const chatUploadBtn = document.getElementById('chat-upload-photo'); // may be null in embedded, we use chatPhotoInput
+// const chatPhotoInput = document.getElementById('chat-photo-input');
+// const chatUploadBtn = document.getElementById('chat-upload-photo'); // may be null in embedded, we use chatPhotoInput
 
 function appendMessage(text, cls='bot') {
 	const d = document.createElement('div');
@@ -206,16 +206,9 @@ function pickSuggestion(budget) {
 let currentUserId = localStorage.getItem('currentUserId') || null;
 let currentUser = null;
 
-function avatarUrlForChat(user) {
-	if (!user) return '';
-	if (user.photoUrl) {
-		if (user.photoUrl.startsWith('http')) return user.photoUrl;
-		return API_BASE + (user.photoUrl.startsWith('/') ? user.photoUrl : ('/' + user.photoUrl));
-	}
+function initialsFromNameChat(user) {
 	const name = user && user.username ? user.username : 'U';
-	const initials = name.split(' ').map(s=>s[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
-	const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><rect width='100%' height='100%' fill='#e6eefc' /><text x='50%' y='50%' font-family='Arial' font-size='48' fill='#0f172a' text-anchor='middle' dominant-baseline='central'>${initials}</text></svg>`;
-	return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+	return name.split(' ').map(s => s[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
 }
 
 async function loadCurrentUserInfo() {
@@ -227,8 +220,7 @@ async function loadCurrentUserInfo() {
 		else currentUser = null;
 		// actualizar UI (si existen elementos)
 		if (chatUsernameEl) chatUsernameEl.textContent = currentUser ? (currentUser.username || 'Usuario') : 'Invitado';
-		if (chatUserAvatar && currentUser) chatUserAvatar.src = avatarUrlForChat(currentUser);
-		if (chatUserAvatar && !currentUser) chatUserAvatar.src = '';
+		if (chatUserAvatar) chatUserAvatar.textContent = currentUser ? initialsFromNameChat(currentUser) : '';
 	} catch (err) {
 		console.warn('loadCurrentUserInfo', err);
 	}
@@ -247,47 +239,47 @@ window.addEventListener('chat-opened', () => {
 	loadCurrentUserInfo();
 });
 
-// adaptar uploadChatPhoto si input existe
-async function uploadChatPhoto() {
-	if (!currentUserId) return alert('No estás identificado. Selecciona un usuario en la app principal.');
-	const file = chatPhotoInput && chatPhotoInput.files && chatPhotoInput.files[0];
-	if (!file) return alert('Selecciona una imagen');
-	const reader = new FileReader();
-	reader.onload = async () => {
-		const dataUrl = reader.result;
-		try {
-			const res = await fetch(`${API_BASE}/api/users/${currentUserId}/photo`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ dataUrl })
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(()=>({error:'error'}));
-				return alert('Error al subir foto: ' + (err && err.error ? err.error : ''));
-			}
-			const updated = await res.json();
-			// actualizar UI y caché
-			await loadCurrentUserInfo();
-			try {
-				const cached = JSON.parse(localStorage.getItem('cachedUsers') || '[]');
-				const mapped = cached.map(u => (u._id == updated._id ? updated : u));
-				localStorage.setItem('cachedUsers', JSON.stringify(mapped));
-			} catch(e){}
-			alert('Foto actualizada');
-			if (chatPhotoInput) chatPhotoInput.value = '';
-			// notify main app to refresh header avatar
-			try { localStorage.setItem('cachedUsers-updated-at', Date.now().toString()); } catch(e){}
-		} catch (err) {
-			console.error('uploadChatPhoto error', err);
-			alert('Error al subir la foto');
-		}
-	};
-	reader.readAsDataURL(file);
-}
+// eliminar: uploadChatPhoto si input existe
+// async function uploadChatPhoto() {
+// 	if (!currentUserId) return alert('No estás identificado. Selecciona un usuario en la app principal.');
+// 	const file = chatPhotoInput && chatPhotoInput.files && chatPhotoInput.files[0];
+// 	if (!file) return alert('Selecciona una imagen');
+// 	const reader = new FileReader();
+// 	reader.onload = async () => {
+// 		const dataUrl = reader.result;
+// 		try {
+// 			const res = await fetch(`${API_BASE}/api/users/${currentUserId}/photo`, {
+// 				method: 'POST',
+// 				headers: { 'Content-Type': 'application/json' },
+// 				body: JSON.stringify({ dataUrl })
+// 			});
+// 			if (!res.ok) {
+// 				const err = await res.json().catch(()=>({error:'error'}));
+// 				return alert('Error al subir foto: ' + (err && err.error ? err.error : ''));
+// 			}
+// 			const updated = await res.json();
+// 			// actualizar UI y caché
+// 			await loadCurrentUserInfo();
+// 			try {
+// 				const cached = JSON.parse(localStorage.getItem('cachedUsers') || '[]');
+// 				const mapped = cached.map(u => (u._id == updated._id ? updated : u));
+// 				localStorage.setItem('cachedUsers', JSON.stringify(mapped));
+// 			} catch(e){}
+// 			alert('Foto actualizada');
+// 			if (chatPhotoInput) chatPhotoInput.value = '';
+// 			// notify main app to refresh header avatar
+// 			try { localStorage.setItem('cachedUsers-updated-at', Date.now().toString()); } catch(e){}
+// 		} catch (err) {
+// 			console.error('uploadChatPhoto error', err);
+// 			alert('Error al subir la foto');
+// 		}
+// 	};
+// 	reader.readAsDataURL(file);
+// }
 
-if (chatPhotoInput) {
-	chatPhotoInput.addEventListener('change', uploadChatPhoto);
-}
+// if (chatPhotoInput) {
+// 	chatPhotoInput.addEventListener('change', uploadChatPhoto);
+// }
 
 // adaptar getTransactions/getWallet para filtrar por usuario si existe el currentUserId
 async function getTransactionsFilteredForUser() {
@@ -792,4 +784,11 @@ function injectChatStyles() {
 })();
 
 })(); // end IIFE
+	await loadCurrentUserInfo();
+	injectChatStyles();
+	// vincular botones de cierre si existen
+	bindChatCloseButtons();
+	if (chatWindow) renderHistory();
+
+
 
