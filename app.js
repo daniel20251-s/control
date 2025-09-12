@@ -1,3 +1,4 @@
+
 /* Reemplazo completo del archivo con versión consolidada y sin duplicados.
    ...existing code... (funcionalidad preservada) */
 
@@ -687,17 +688,6 @@ if (changePhotoBtn && changePhotoInput) {
 		};
 		reader.readAsDataURL(file);
 	});
-}
-// NUEVO: permitir pulsar el avatar para abrir el selector (misma lógica de comprobación de usuario)
-if (headerAvatar && changePhotoInput) {
-	try {
-		headerAvatar.style.cursor = 'pointer';
-		headerAvatar.addEventListener('click', () => {
-			const cur = getCurrentUser();
-			if (!cur) return alert('Selecciona un usuario antes de cambiar la foto');
-			changePhotoInput.click();
-		});
-	} catch(e){ console.warn('headerAvatar click handler', e); }
 }
 
 // auth overlay: botón "Subir" que abre input y carga para usuario seleccionado
