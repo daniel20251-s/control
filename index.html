@@ -23,8 +23,10 @@
 			<div class="header-user-inner">
 				<img id="header-avatar" src="" alt="avatar" class="header-avatar" />
 				<!-- input oculto y lápiz junto al avatar (el handler ya está en app.js) -->
-				<input id="change-photo-input" type="file" accept="image/*" capture="environment" style="display:none" />
-				<button id="change-photo-btn" class="btn change-photo-btn" title="Cambiar foto" style="display:none">✏️</button>
+				<!-- quitar "capture" para permitir galería + cámara según el selector del dispositivo -->
+				<input id="change-photo-input" type="file" accept="image/*" style="display:none" />
+				<!-- hacer el botón más accesible y con aria-label -->
+				<button id="change-photo-btn" class="btn change-photo-btn" title="Cambiar foto" aria-label="Cambiar foto" style="display:none">✏️</button>
 				<strong id="header-username" class="header-username">Usuario</strong>
 			</div>
 		</div>
@@ -182,4 +184,5 @@
 	<script src="chat.js"></script>
 </body>
 </html>
+
 
