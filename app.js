@@ -1,4 +1,3 @@
-
 /* Reemplazo completo del archivo con versión consolidada y sin duplicados.
    ...existing code... (funcionalidad preservada) */
 
@@ -45,6 +44,8 @@ const clearScheduledBtn = $('#clear-scheduled');
 const scheduledListEl = $('#scheduled-list');
 
 const enablePushBtn = $('#enable-push-btn');
+const wakeServerBtn = document.getElementById('wake-server-btn');
+const serverStatusIndicator = document.getElementById('server-status-indicator');
 
 let transactions = [];
 let users = [];
@@ -645,6 +646,62 @@ function handleLogout() {
 		showAuthOverlay();
 	} catch (e) { console.warn('handleLogout error', e); }
 }
+
+// Función para checar el estado del servidor
+async function checkServerStatus() {
+	try {
+		if (serverStatusIndicator) serverStatusIndicator.textContent = 'Verificando...';
+		const res = await fetch(`${API_BASE}/api/ping`, { cache: 'no-store' });
+		if (res.ok) {
+			if (serverStatusIndicator) {
+				serverStatusIndicator.textContent = 'Activo';
+				serverStatusIndicator.style.color = '#10b981';
+			}
+			return true;
+		} else {
+			if (serverStatusIndicator) {
+				serverStatusIndicator.textContent = 'Desconectado';
+				serverStatusIndicator.style.color = '#888';
+			}
+			return false;
+		}
+	} catch (e) {
+		if (serverStatusIndicator) {
+			serverStatusIndicator.textContent = 'Desconectado';
+			serverStatusIndicator.style.color = '#888';
+		}
+		return false;
+	}
+}
+
+// Handler para el botón de despertar servidor
+if (wakeServerBtn) {
+	wakeServerBtn.addEventListener('click', async () => {
+		wakeServerBtn.disabled = true;
+		wakeServerBtn.textContent = 'Despertando...';
+		const ok = await checkServerStatus();
+		setTimeout(() => {
+			wakeServerBtn.disabled = false;
+			wakeServerBtn.textContent = 'Despertar servidor';
+		}, 1200);
+	});
+}
+
+// Al mostrar el overlay de login, checar el estado del servidor automáticamente
+if (typeof showAuthOverlay === 'function') {
+	const origShowAuthOverlay = showAuthOverlay;
+	window.showAuthOverlay = function() {
+		origShowAuthOverlay();
+		checkServerStatus();
+	};
+}
+
+// También checar el estado al cargar la página por si ya está visible el overlay
+document.addEventListener('DOMContentLoaded', () => {
+	if (authOverlay && authOverlay.style.display !== 'none') {
+		checkServerStatus();
+	}
+});
 
 // Asegurar que login/logout UI button enlazan a las funciones restauradas
 if (loginBtn) {
