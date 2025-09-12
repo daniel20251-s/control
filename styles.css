@@ -1,3 +1,4 @@
+
 :root{
 	--bg:#f6f9fc;
 	--card:#ffffff;
@@ -433,3 +434,35 @@ form input[type="number"]{width:140px}
 	.transactions-list { max-height: 56vh; }
 }
 
+/* avatar (header / auth / chat) como círculo con inicial */
+.header-avatar,
+#auth-avatar,
+#chat-user-avatar {
+	width:44px;
+	height:44px;
+	min-width:44px;
+	min-height:44px;
+	border-radius:50%;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	background:#eef2ff;
+	color:#0f172a;
+	font-weight:700;
+	font-size:1rem;
+	border:1px solid #e6e9ef;
+	box-shadow: 0 2px 6px rgba(2,6,23,0.03);
+}
+
+/* tamaño específico para auth avatar (cuando se usó 56px) */
+#auth-avatar { width:56px; height:56px; min-width:56px; min-height:56px; border-radius:12px; }
+
+/* ocultar por completo controles de cambio de foto si quedan en el DOM */
+.change-photo-btn, #change-photo-input, #auth-photo-input, #auth-upload-photo, #chat-photo-input {
+	display:none !important;
+	pointer-events:none !important;
+	opacity:0 !important;
+}
+
+/* asegurar que no se apliquen reglas contradictorias posteriores */
+.change-photo-btn { display:none !important; }
