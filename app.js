@@ -28,7 +28,6 @@ const logoutBtn = $('#logout-btn');
 
 const headerAvatar = $('#header-avatar');
 const authAvatar = $('#auth-avatar');
-const authPhotoInput = $('#auth-photo-input');
 
 const weeklySalaryEl = $('#weekly-salary');
 const weeklyInput = $('#weekly-salary-input');
@@ -119,50 +118,66 @@ function renderScheduledList() {
 	if (!scheduledListEl) return;
 	scheduledListEl.innerHTML = '';
 	const now = Date.now();
-	scheduledPayments.forEach(s => {
-		const div = document.createElement('div');
-		div.className = 'transaction';
-		div.dataset.id = s._id || s.id;
-		const dueTs = s.nextDue ? new Date(s.nextDue).getTime() : null;
-		const due = s.nextDue ? new Date(s.nextDue).toLocaleDateString() : '—';
-		let isDue = false, isSoon = false;
-		if (dueTs) {
-			if (dueTs <= now) isDue = true;
-			else if (dueTs - now <= 24 * 60 * 60 * 1000) isSoon = true;
-		}
-		if (isSoon) div.classList.add('ending-soon');
-		if (isDue) div.classList.add('due');
+	scheduledPayments
+		// Mostrar solo pagos activos y que no han terminado
+		.filter(s => {
+			if (s.active === false) return false;
+			if (!s.endDate) return true;
+			const end = new Date(s.endDate).setHours(23,59,59,999);
+			return now <= end;
+		})
+		.forEach(s => {
+			const div = document.createElement('div');
+			div.className = 'transaction';
+			div.dataset.id = s._id || s.id;
+			const dueTs = s.nextDue ? new Date(s.nextDue).getTime() : null;
+			const due = s.nextDue ? new Date(s.nextDue).toLocaleDateString() : '—';
+			let isDue = false, isSoon = false;
+			if (dueTs) {
+				if (dueTs <= now) isDue = true;
+				else if (dueTs - now <= 24 * 60 * 60 * 1000) isSoon = true;
+			}
+			if (isSoon) div.classList.add('ending-soon');
+			if (isDue) div.classList.add('due');
 
-		div.innerHTML = `
-			<div class="tx-left">
-				<strong>${s.description}</strong>
-				<br/><small>${s.category || 'General'} · ${s.frequency || '—'} · próxima: ${due}${s.username ? ' · por ' + s.username : ''}</small>
-			</div>
-			<div class="tx-right">
-				<span>${formatMoney(Number(s.amount || 0))}</span>
-				<div class="tx-actions">
-					<button class="btn small" data-action="pay">Pagar</button>
-					<button class="btn small danger" data-action="del">Eliminar</button>
+			// Mostrar frecuencia en texto legible
+			let freqText = '—';
+			switch (s.frequency) {
+				case 'weekly': freqText = 'Semanal'; break;
+				case 'monthly': freqText = 'Mensual'; break;
+				case 'biweekly': freqText = 'Quincenal'; break;
+				case 'once': freqText = 'Una vez'; break;
+				default: freqText = s.frequency || '—';
+			}
+
+			div.innerHTML = `
+				<div class="tx-left">
+					<strong>${s.description}</strong>
+					<br/><small>${s.category || 'General'} · ${freqText} · próxima: ${due}${s.username ? ' · por ' + s.username : ''}</small>
 				</div>
-			</div>
-		`;
-		// Badge visual compacto con emoji y color según estado (vencido / próximo / normal)
-		(function addSchedBadge() {
-			const left = div.querySelector('.tx-left');
-			if (!left) return;
-			const badge = document.createElement('span');
-			badge.className = 'sched-badge ' + (isDue ? 'due' : (isSoon ? 'soon' : 'normal'));
-			badge.textContent = isDue ? '⚠️ Vencido' : (isSoon ? '🔔 Próximo' : '📌 Programado');
-			// insertamos antes del título para visibilidad
-			left.insertBefore(badge, left.firstChild);
-		})();
+				<div class="tx-right">
+					<span>${formatMoney(Number(s.amount || 0))}</span>
+					<div class="tx-actions">
+						<button class="btn small" data-action="pay">Pagar</button>
+						<button class="btn small danger" data-action="del">Eliminar</button>
+					</div>
+				</div>
+			`;
+			(function addSchedBadge() {
+				const left = div.querySelector('.tx-left');
+				if (!left) return;
+				const badge = document.createElement('span');
+				badge.className = 'sched-badge ' + (isDue ? 'due' : (isSoon ? 'soon' : 'normal'));
+				badge.textContent = isDue ? '⚠️ Vencido' : (isSoon ? '🔔 Próximo' : '📌 Programado');
+				left.insertBefore(badge, left.firstChild);
+			})();
 
- 		scheduledListEl.appendChild(div);
- 		const payBtn = div.querySelector('[data-action="pay"]');
- 		const delBtn = div.querySelector('[data-action="del"]');
- 		if (payBtn) payBtn.addEventListener('click', () => payScheduled(div.dataset.id));
- 		if (delBtn) delBtn.addEventListener('click', () => deleteScheduled(div.dataset.id));
- 	});
+			scheduledListEl.appendChild(div);
+			const payBtn = div.querySelector('[data-action="pay"]');
+			const delBtn = div.querySelector('[data-action="del"]');
+			if (payBtn) payBtn.addEventListener('click', () => payScheduled(div.dataset.id));
+			if (delBtn) delBtn.addEventListener('click', () => deleteScheduled(div.dataset.id));
+		});
 }
 
 // AUTH / USERS
@@ -203,41 +218,22 @@ async function registerUser() {
 		if (authUserSelect) authUserSelect.value = user._id;
 		localStorage.setItem('currentUserId', user._id);
 		if (authUsernameInput) authUsernameInput.value = '';
-		if (authPhotoInput && authPhotoInput.files && authPhotoInput.files[0]) {
-			const file = authPhotoInput.files[0];
-			const r = new FileReader();
-			r.onload = async () => {
-				try { await uploadProfilePhotoForUser(user._id || user.id, r.result); } catch(e){ console.warn(e); }
-				authPhotoInput.value = '';
-			};
-			r.readAsDataURL(file);
-		}
 		handleLogin();
 	} catch (e) {
 		alert('Error registro');
 	}
 }
 
-function svgAvatarDataUrl(name) {
-	const initials = (name || '').split(' ').map(s=>s[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U';
-	const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><rect width='100%' height='100%' fill='#f3f4f6' /><text x='50%' y='50%' font-family='Arial' font-size='48' fill='#0f172a' text-anchor='middle' dominant-baseline='central'>${initials}</text></svg>`;
-	return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+// util: obtener iniciales a partir del nombre
+function initialsFromName(name) {
+	return (name || '').split(' ').map(s => s[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U';
 }
-
-function avatarUrlFor(user) {
-	if (!user) return '';
-	if (user.photoUrl) {
-		if (user.photoUrl.startsWith('http')) return user.photoUrl;
-		return API_BASE + (user.photoUrl.startsWith('/') ? user.photoUrl : ('/' + user.photoUrl));
-	}
-	return svgAvatarDataUrl(user && user.username ? user.username : '');
+// helper para renderizar inicial en un elemento (si existe)
+function setInitialsOn(el, name) {
+	if (!el) return;
+	el.textContent = initialsFromName(name);
+	el.style.display = name ? 'inline-flex' : 'none';
 }
-function attachAvatarFallback(imgEl, user) {
-	if (!imgEl) return;
-	imgEl.onerror = () => { imgEl.src = svgAvatarDataUrl(user && user.username ? user.username : ''); };
-}
-if (headerAvatar) headerAvatar.onerror = () => { headerAvatar.src = svgAvatarDataUrl(''); };
-if (authAvatar) authAvatar.onerror = () => { authAvatar.src = svgAvatarDataUrl(''); };
 
 async function populateUserSelect(list) {
 	users = list || [];
@@ -258,7 +254,7 @@ async function populateUserSelect(list) {
 		authUserSelect.value = saved;
 		const sel = users.find(x => (x._id || x.id) == saved);
 		if (sel) {
-			if (authAvatar) authAvatar.src = avatarUrlFor(sel);
+			if (authAvatar) setInitialsOn(authAvatar, sel.username);
 			updateHeaderUser(sel);
 		}
 	}
@@ -272,9 +268,8 @@ async function loadUsersAndPopulate() {
 		if (saved) {
 			const sel = list.find(u => (u._id || u.id) == saved);
 			if (sel) {
-				if (authAvatar) { authAvatar.src = avatarUrlFor(sel); attachAvatarFallback(authAvatar, sel); }
+				if (authAvatar) setInitialsOn(authAvatar, sel.username);
 				updateHeaderUser(sel);
-				attachAvatarFallback(headerAvatar, sel);
 			}
 		}
 	} catch(e){ console.warn('loadUsersAndPopulate post actions', e); }
@@ -283,14 +278,13 @@ async function loadUsersAndPopulate() {
 function updateHeaderUser(user) {
 	try {
 		if (headerAvatar) {
-			headerAvatar.src = user && user.photoUrl ? avatarUrlFor(user) : svgAvatarDataUrl(user && user.username ? user.username : '');
-			headerAvatar.style.display = user ? 'inline-block' : 'none';
+			setInitialsOn(headerAvatar, user ? user.username : '');
 		}
 		// Mostrar/ocultar control de cambiar foto en header (solo el lápiz)
 		try {
 			const btn = document.getElementById('change-photo-btn');
 			// mantener el input siempre oculto; solo mostrar el lápiz cuando hay usuario
-			if (btn) btn.style.display = user ? 'inline-block' : 'none';
+			if (btn) btn.style.display = 'none';
 		} catch(e){}
 		const nameEl = document.getElementById('header-username');
 		if (nameEl) {
@@ -410,6 +404,13 @@ async function deleteTransaction(id) {
 			renderList();
 		}
 	} catch (e) { console.warn('deleteTransaction', e); }
+}
+
+// Notificación nativa del navegador (si está permitido)
+function notifyUser(title, body) {
+	if (window.Notification && Notification.permission === 'granted') {
+		new Notification(title, { body });
+	}
 }
 
 // Push & ServiceWorker helpers (únicos)
@@ -589,6 +590,8 @@ async function initAfterAuth() {
 			scheduledPayments = scheduledPayments.filter(x => (x._id || x.id) !== d.id);
 			renderScheduledList();
 		});
+		// Escuchar evento de término de pago programado (emitido por el backend)
+		socket.on('scheduled:ended', s => { try { handleScheduledEnded(s); } catch(e){ console.warn(e); } });
 	} catch (err) {
 		console.warn('No se pudo conectar a Socket.IO, usando polling:', err && err.message);
 		startPolling();
@@ -609,29 +612,12 @@ function handleScheduledPaid(obj) {
 	try { notifyUser('Pago registrado', `${s.description} · ${amt}`); } catch(e){ console.warn(e); }
 	if (headerAvatar) { headerAvatar.classList.add('success-burst'); setTimeout(()=> headerAvatar.classList.remove('success-burst'), 1000); }
 }
-
-// simple upload helper used on register
-async function uploadProfilePhotoForUser(userId, dataUrl) {
-	if (!userId || !dataUrl) return null;
-	try {
-		const res = await fetch(`${API_BASE}/api/users/${userId}/photo`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ dataUrl })
-		});
-		if (!res.ok) throw new Error('upload failed');
-		const updated = await res.json();
-		try {
-			const cached = JSON.parse(localStorage.getItem('cachedUsers') || '[]');
-			const mapped = cached.map(u => ((u._id == updated._id) ? updated : u));
-			localStorage.setItem('cachedUsers', JSON.stringify(mapped));
-		} catch(e){}
-		await loadUsersAndPopulate();
-		return updated;
-	} catch (e) {
-		console.warn('uploadProfilePhotoForUser', e);
-		return null;
-	}
+// Manejar notificación especial cuando un pago termina
+function handleScheduledEnded(s) {
+	const amt = s.amount ? formatMoney(Number(s.amount)) : '';
+	const end = s.endDate ? new Date(s.endDate).toLocaleDateString() : '';
+	showAlert('info', 'Pago programado finalizado', `${s.description} ${amt} — hasta ${end}`, { timeout: 7000 });
+	try { notifyUser('Pago programado finalizado', `${s.description}: ${amt} — hasta ${end}`); } catch(e){ console.warn(e); }
 }
 
 // Restaurar/añadir handlers faltantes: login/logout y control de fotos + abrir chat
@@ -658,83 +644,6 @@ function handleLogout() {
 		socket = null;
 		showAuthOverlay();
 	} catch (e) { console.warn('handleLogout error', e); }
-}
-
-// botón de cambiar foto en header -> abrir input file
-const changePhotoBtn = document.getElementById('change-photo-btn');
-const changePhotoInput = document.getElementById('change-photo-input');
-if (changePhotoBtn && changePhotoInput) {
-	changePhotoBtn.addEventListener('click', () => {
-		const cur = getCurrentUser();
-		if (!cur) return alert('Selecciona un usuario antes de cambiar la foto');
-		changePhotoInput.click();
-	});
-	changePhotoInput.addEventListener('change', async () => {
-		const cur = getCurrentUser();
-		if (!cur) return alert('Selecciona un usuario antes de subir la foto');
-		const file = changePhotoInput.files && changePhotoInput.files[0];
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = async () => {
-			try {
-				await uploadProfilePhotoForUser(cur._id || cur.id, reader.result);
-				// recargar usuarios y header
-				await loadUsersAndPopulate();
-				const refreshed = users.find(u => (u._id || u.id) == (cur._id || cur.id));
-				if (refreshed) updateHeaderUser(refreshed);
-				alert('Foto actualizada');
-			} catch (e) { console.warn('changePhoto upload error', e); alert('No se pudo actualizar la foto'); }
-			finally { changePhotoInput.value = ''; }
-		};
-		reader.readAsDataURL(file);
-	});
-}
-
-// auth overlay: botón "Subir" que abre input y carga para usuario seleccionado
-const authUploadBtn = document.getElementById('auth-upload-photo');
-if (authUploadBtn && authPhotoInput) {
-	authUploadBtn.addEventListener('click', () => {
-		// si hay un usuario seleccionado, abrir input para elegir archivo
-		const sel = getCurrentUser();
-		if (!sel) return alert('Selecciona un usuario en el selector antes de subir foto');
-		authPhotoInput.click();
-	});
-}
-// Si se cambia el archivo en el overlay, subirlo para el usuario seleccionado
-if (authPhotoInput) {
-	authPhotoInput.addEventListener('change', async () => {
-		const sel = getCurrentUser();
-		if (!sel) return alert('Selecciona un usuario antes de subir la foto');
-		const file = authPhotoInput.files && authPhotoInput.files[0];
-		if (!file) return;
-		const r = new FileReader();
-		r.onload = async () => {
-			try {
-				await uploadProfilePhotoForUser(sel._id || sel.id, r.result);
-				await loadUsersAndPopulate();
-				alert('Foto subida correctamente');
-			} catch (e) { console.warn('auth photo upload error', e); alert('Error al subir foto'); }
-			finally { authPhotoInput.value = ''; }
-		};
-		r.readAsDataURL(file);
-	});
-}
-
-// botón del asistente (abrir chat embebido) - muestra widget y notifica al chat.js
-const openChatBtn = document.getElementById('open-chat-btn');
-if (openChatBtn) {
-	openChatBtn.addEventListener('click', () => {
-		const widget = document.getElementById('chat-widget');
-		if (!widget) return;
-		const isVisible = widget.style.display && widget.style.display !== 'none';
-		if (isVisible) {
-			widget.style.display = 'none';
-			try { window.dispatchEvent(new Event('chat-closed')); } catch(e){}
-		} else {
-			widget.style.display = 'block';
-			try { window.dispatchEvent(new Event('chat-opened')); } catch(e){}
-		}
-	});
 }
 
 // Asegurar que login/logout UI button enlazan a las funciones restauradas
@@ -793,15 +702,10 @@ if (loginBtn) {
 // initial bootstrap
 (async function bootstrap(){
 	try {
-		await loadUsersAndPopulate();
-		const cur = localStorage.getItem('currentUserId');
-		if (!cur) showAuthOverlay(); else { if (authUserSelect) authUserSelect.value = cur; hideAuthOverlay(); await initAfterAuth(); }
-		// register SW to enable prompt later
-		try { swRegistrationForPush = swRegistrationForPush || await registerServiceWorkerAndGetRegistration(); } catch(e){ console.warn('SW init', e); }
-	} catch(e){ console.warn('bootstrap error', e); }
-})();
-(async function bootstrap(){
-	try {
+		// Solicitar permiso de notificaciones al inicio si no está concedido
+		if (window.Notification && Notification.permission !== 'granted') {
+			try { await Notification.requestPermission(); } catch(e){}
+		}
 		await loadUsersAndPopulate();
 		const cur = localStorage.getItem('currentUserId');
 		if (!cur) showAuthOverlay(); else { if (authUserSelect) authUserSelect.value = cur; hideAuthOverlay(); await initAfterAuth(); }
