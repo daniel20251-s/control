@@ -659,51 +659,13 @@ function handleLogout() {
 	} catch (e) { console.warn('handleLogout error', e); }
 }
 
-// Añadir helper para permisos de cámara/foto (Capacitor-aware, con fallback web)
-async function ensurePhotoPermission() {
-	try {
-		// Capacitor runtime (si se ha integrado)
-		if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera && typeof window.Capacitor.Plugins.Camera.requestPermissions === 'function') {
-			const res = await window.Capacitor.Plugins.Camera.requestPermissions();
-			// res puede variar según versión; considerar granted / camera / photos
-			if (res && (res.camera === 'granted' || res.photos === 'granted' || res.value === 'granted')) return true;
-			// versiones que retornan objeto con camera/photos booleans
-			if (res && (res.camera === true || res.photos === true)) return true;
-			// fallback: si no está claro, devolver true para permitir el input (la plataforma luego pedirá permiso)
-			return true;
-		}
-		// Fallback navegador: intentar getUserMedia (pedirá permiso)
-		if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-			const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-			// detener tracks inmediatamente
-			if (stream && stream.getTracks) stream.getTracks().forEach(t => t.stop());
-			return true;
-		}
-	} catch (e) {
-		console.warn('ensurePhotoPermission error', e);
-	}
-	// no se pudo obtener permiso
-	return false;
-}
-
-// Forzar atributo capture en inputs para mejor experiencia en Android/Capacitor
-try {
-	if (changePhotoInput) changePhotoInput.setAttribute('accept', 'image/*');
-	if (changePhotoInput) changePhotoInput.setAttribute('capture', 'environment');
-	if (authPhotoInput) authPhotoInput.setAttribute('accept', 'image/*');
-	if (authPhotoInput) authPhotoInput.setAttribute('capture', 'environment');
-} catch(e){}
-
 // botón de cambiar foto en header -> abrir input file
 const changePhotoBtn = document.getElementById('change-photo-btn');
 const changePhotoInput = document.getElementById('change-photo-input');
 if (changePhotoBtn && changePhotoInput) {
-	changePhotoBtn.addEventListener('click', async () => {
+	changePhotoBtn.addEventListener('click', () => {
 		const cur = getCurrentUser();
 		if (!cur) return alert('Selecciona un usuario antes de cambiar la foto');
-		// pedir permiso antes de abrir el selector (mejor experiencia en Android/Capacitor)
-		const ok = await ensurePhotoPermission().catch(()=>false);
-		if (!ok) return alert('Permiso de cámara/fotos denegado.');
 		changePhotoInput.click();
 	});
 	changePhotoInput.addEventListener('change', async () => {
@@ -730,36 +692,13 @@ if (changePhotoBtn && changePhotoInput) {
 // auth overlay: botón "Subir" que abre input y carga para usuario seleccionado
 const authUploadBtn = document.getElementById('auth-upload-photo');
 if (authUploadBtn && authPhotoInput) {
-	authUploadBtn.addEventListener('click', async () => {
+	authUploadBtn.addEventListener('click', () => {
 		// si hay un usuario seleccionado, abrir input para elegir archivo
 		const sel = getCurrentUser();
 		if (!sel) return alert('Selecciona un usuario en el selector antes de subir foto');
-		const ok = await ensurePhotoPermission().catch(()=>false);
-		if (!ok) return alert('Permiso de cámara/fotos denegado.');
 		authPhotoInput.click();
 	});
 }
-// Si se cambia el archivo en el overlay, subirlo para el usuario seleccionado
-if (authPhotoInput) {
-	authPhotoInput.addEventListener('change', async () => {
-		const sel = getCurrentUser();
-		if (!sel) return alert('Selecciona un usuario antes de subir la foto');
-		const file = authPhotoInput.files && authPhotoInput.files[0];
-		if (!file) return;
-		const r = new FileReader();
-		r.onload = async () => {
-			try {
-				await uploadProfilePhotoForUser(sel._id || sel.id, r.result);
-				await loadUsersAndPopulate();
-				alert('Foto subida correctamente');
-			} catch (e) { console.warn('auth photo upload error', e); alert('Error al subir foto'); }
-			finally { authPhotoInput.value = ''; }
-		};
-		r.readAsDataURL(file);
-	});
-}
-
-
 // Si se cambia el archivo en el overlay, subirlo para el usuario seleccionado
 if (authPhotoInput) {
 	authPhotoInput.addEventListener('change', async () => {
