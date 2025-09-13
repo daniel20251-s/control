@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title>Control de Gastos</title>
+	<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+	<!-- Pull-to-refresh (tres puntos) -->
+	<div id="pull-refresh" class="pull-refresh" aria-hidden="true">
+		<div class="dots" id="pull-dots" aria-hidden="true">
+			<span></span><span></span><span></span>
+		</div>
+	</div>
+
+	<!-- ALERTS: contenedor para notificaciones visuales y animadas -->
+	<div id="alerts-container" aria-live="polite" style="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;pointer-events:none;width:calc(100% - 32px);max-width:720px;display:flex;flex-direction:column;gap:8px;align-items:center"></div>
+
+	<header class="header">
+		<!-- izquierda: usuario (avatar + lápiz + nombre) -->
+		<div class="header-user" aria-hidden="false">
+			<div class="header-user-inner">
+				<!-- Avatar simple: solo círculo con inicial -->
+				<div id="header-avatar" class="header-avatar" aria-hidden="false"></div>
+				<strong id="header-username" class="header-username">Usuario</strong>
+			</div>
+		</div>
+
+		<!-- centrado: título -->
+		<div class="header-center">
+			<h1>Mi Finanzas</h1>
+			<p class="subtitle">Controla tus ingresos y gastos de forma simple</p>
+		</div>
+
+		<!-- derecha: controles -->
+		<div class="header-controls" aria-hidden="false">
+			<a id="open-chat-btn" class="btn" href="chat-standalone.html" target="_blank" rel="noopener">Asistente</a>
+			<button id="enable-push-btn" class="btn">Activar notifs</button>
+			<button id="logout-btn" class="btn" style="display:none">Salir</button>
+		</div>
+	</header>
+
+	<!-- NUEVO: overlay de autenticación (se muestra hasta iniciar sesión) -->
+	<div id="auth-overlay" class="overlay">
+		<div class="auth-card">
+			<h2>Iniciar sesión</h2>
+			<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+				<!-- Avatar en overlay: solo círculo con inicial -->
+				<div id="auth-avatar" style="width:56px;height:56px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #e6e9ef;background:#f3f4f6;font-weight:700"></div>
+				<div style="flex:1">
+					<select id="auth-user-select" style="padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-top:0;width:100%"></select>
+				</div>
+			</div>
+
+			<div style="display:flex;gap:8px;margin-top:8px">
+				<input id="auth-username-input" type="text" placeholder="Nuevo usuario" style="flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef" />
+				<button id="auth-register-user" class="btn">Registrar</button>
+			</div>
+			<button id="login-btn" class="btn primary" style="margin-top:12px;width:100%">Iniciar sesión</button>
+			<!-- NUEVO: Botón para despertar servidor y estado -->
+			<div style="margin-top:14px;display:flex;align-items:center;gap:10px;justify-content:center">
+				<button id="wake-server-btn" class="btn" type="button">Despertar servidor</button>
+				<span id="server-status-indicator" style="font-size:0.98em;color:#888">Desconectado</span>
+			</div>
+		</div>
+	</div>
+
+	<main id="app-main" class="container">
+		<section class="balance-card">
+			<div>
+				<h2>Balance</h2>
+				<p id="balance" class="balance-amount">€0.00</p>
+			</div>
+			<div class="totals">
+				<div class="total income">
+					<span>Ingresos</span>
+					<strong id="total-income">€0.00</strong>
+				</div>
+				<div class="total expense">
+					<span>Gastos</span>
+					<strong id="total-expense">€0.00</strong>
+				</div>
+			</div>
+
+			<!-- NUEVO: control de sueldo semanal y botón de pago -->
+			<div style="display:flex;flex-direction:column;gap:8px;margin-left:16px;min-width:200px">
+				<div style="display:flex;justify-content:space-between;align-items:center">
+					<small style="color:var(--muted)">Sueldo semanal</small>
+					<strong id="weekly-salary">€0.00</strong>
+				</div>
+				<div style="display:flex;gap:8px">
+					<input id="weekly-salary-input" type="number" step="0.01" placeholder="0.00" style="padding:8px;border-radius:8px;border:1px solid #e6e9ef;min-width:0" />
+					<button id="set-weekly-salary" class="btn">Guardar</button>
+				</div>
+				<button id="pay-salary" class="btn primary">dia de pago</button>
+			</div>
+		</section>
+
+		<section class="form-section">
+			<h3>Añadir transacción</h3>
+			<form id="transaction-form">
+				<div class="row">
+					<select id="type" required>
+						<option value="income">Ingreso</option>
+						<option value="expense">Gasto</option>
+					</select>
+					<input id="description" type="text" placeholder="Descripción" required />
+					<input id="amount" type="number" step="0.01" placeholder="0.00" required />
+					<select id="category" required>
+						<option value="General">General</option>
+						<option value="Comida">Comida</option>
+						<option value="Transporte">Transporte</option>
+						<option value="Casa">Casa</option>
+						<option value="Ocio">Ocio</option>
+					</select>
+				</div>
+				<div class="row actions">
+					<button type="submit" class="btn primary">Añadir</button>
+					<button type="button" id="clear-all" class="btn danger">Borrar todo</button>
+				</div>
+			</form>
+		</section>
+
+		<section class="list-section">
+			<h3>Transacciones</h3>
+			<div id="transactions-list" class="transactions-list">
+				<!-- Transacciones renderizadas aquí -->
+			</div>
+		</section>
+
+		<!-- NUEVO: pagos programados -->
+		<section class="list-section">
+			<h3>Pagos programados</h3>
+			<form id="scheduled-form" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+				<input id="sched-description" type="text" placeholder="Descripción del pago" required />
+				<input id="sched-amount" type="number" step="0.01" placeholder="Cantidad" required />
+				<select id="sched-frequency" required>
+					<option value="weekly">Semanal</option>
+					<option value="biweekly">Quincenal</option>
+					<option value="monthly">Mensual</option>
+					<option value="once">Una vez</option>
+				</select>
+				<label>Próxima fecha de pago<input id="sched-nextdue" type="date" required /></label>
+				<label>Hasta (opcional)<input id="sched-enddate" type="date" /></label>
+				<div style="display:flex;gap:8px">
+					<button id="create-scheduled" class="btn primary" type="button">Crear programado</button>
+					<button id="clear-scheduled" class="btn" type="button">Limpiar</button>
+				</div>
+			</form>
+
+			<div id="scheduled-list" class="transactions-list">
+				<!-- Programados -->
+			</div>
+		</section>
+	</main>
+
+	<!-- CHAT WIDGET EMBEBIDO (ventanita modal) -->
+	<div id="chat-widget" style="display:none;position:fixed;right:20px;bottom:20px;width:340px;max-width:90%;z-index:9999;border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(2,6,23,0.2);background:#fff">
+		<div style="padding:10px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:8px">
+			<div id="chat-user-avatar" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #e6e9ef;background:#f3f4f6;font-weight:700"></div>
+			<div style="flex:1;display:flex;flex-direction:column;min-width:0">
+				<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="chat-username">Invitado</div>
+				<div id="chat-user-state" style="font-size:12px;color:var(--muted);min-height:16px"></div>
+			</div>
+			<!-- Selector claro de destinatario para elegir con quién mensajear -->
+			<select id="chat-recipient-select" style="margin-left:8px;padding:6px;border-radius:8px;border:1px solid #e6e9ef;background:#fff;max-width:120px;">
+				<option value="">Seleccionar contacto</option>
+			</select>
+			<button id="chat-close-btn" class="btn" style="padding:6px 8px">Cerrar</button>
+		</div>
+
+		<div id="chat-window" class="chat-window" style="height:280px;overflow:auto;padding:10px;background:#fbfdff"></div>
+
+		<form id="chat-form" class="chat-form" style="display:flex;gap:8px;padding:8px;border-top:1px solid #f0f2f5">
+			<input id="chat-input" type="text" placeholder="Pregunta: ¿cuánto me queda?" autocomplete="off" style="flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef" />
+			<button type="submit" class="btn">Enviar</button>
+		</form>
+		<!-- (sin control de subida de fotos) -->
+	</div>
+
+	<!-- cargar scripts -->
+	<script src="app.js"></script>
+	<script src="chat.js"></script>
+</body>
+</html>
+
+	<!-- cargar scripts -->
+	<script src="app.js"></script>
+	<script src="chat.js"></script>
+</body>
+</html>
+
+
+
+

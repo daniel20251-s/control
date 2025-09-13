@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title>Chat - Control de Gastos</title>
+	<link rel="stylesheet" href="chat.css" />
+	<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+	<!-- contenedor principal que usa chat.css -->
+	<div class="chat-app full-screen" role="application" aria-label="Chat">
+		<header class="chat-header" style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+			<div style="display:flex;align-items:center;gap:10px;min-width:0">
+				<div id="chat-user-avatar" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #e6e9ef;background:#f3f4f6;font-weight:700">💬</div>
+				<div style="display:flex;flex-direction:column;min-width:0">
+					<h2 id="chat-username" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Invitado</h2>
+					<div id="chat-user-state" style="font-size:12px;color:var(--muted);min-height:16px">Asistente financiero</div>
+				</div>
+			</div>
+			<div style="display:flex;align-items:center;gap:8px">
+				<select id="chat-recipient-select" style="padding:6px;border-radius:8px;border:1px solid #e6e9ef;background:#fff;max-width:160px;">
+					<option value="">Seleccionar contacto</option>
+				</select>
+				<a href="index.html" class="btn" style="text-decoration:none;padding:8px 10px">Volver</a>
+			</div>
+		</header>
+
+		<!-- ventana de mensajes (ids requeridos por chat.js) -->
+		<div id="chat-window" class="chat-window" role="log" aria-live="polite"></div>
+
+		<!-- formulario de entrada (pegado abajo por CSS .chat-form flex:0) -->
+		<form id="chat-form" class="chat-form" autocomplete="off">
+			<input id="chat-input" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" />
+			<button type="submit" class="btn">Enviar</button>
+		</form>
+	</div>
+
+	<!-- cargar script de chat (usa los mismos ids) -->
+	<script src="chat.js"></script>
+</body>
+</html>
