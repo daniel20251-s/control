@@ -631,7 +631,8 @@ form input[type="number"]{width:140px}
 /* responsive: reducir ancho y subir espacio cuando el header-controls está fijo */
 @media (max-width:720px){
 	#chat-widget { right:12px; left:12px; bottom:12px; width:auto; height:56vh; max-height:80vh; }
-	.chat-bubble { right:12px; bottom:12px; }
+	/* elevar la burbuja para no tapar los controles fijos (ej. botón "Salir") */
+	.chat-bubble { right:12px; bottom:86px; }
 	.chat-window { padding:10px; gap:8px; }
 	.chat-form { padding:8px; }
 	.chat-form input[type="text"]{ padding:10px; }
