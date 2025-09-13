@@ -20,6 +20,13 @@
 	let socket = null;
 	let selectedContactId = null;
 	let unreadCount = 0;
+	let lastTypingTimeout = null;
+	let typingState = false;
+	let lastReadMessageId = null;
+	let lastDeliveredMessageId = null;
+	let contactPresence = {}; // { userId: { online, lastSeen } }
+	let typingIndicator = false;
+	let sentMessages = {}; // { messageId: { delivered: bool, seen: bool } }
 
 	function createBubbleIfNeeded() {
 		if (bubble) return bubble;
@@ -137,10 +144,26 @@
 	function renderMessages(list, currentUserId) {
 		if (!chatWindow) return;
 		chatWindow.innerHTML = '';
-		list.forEach(m => {
+		list.forEach((m, idx) => {
+			const isUser = String(m.fromUserId) === String(currentUserId);
+			const isLast = idx === list.length - 1;
+			let statusHtml = '';
+			if (isUser) {
+				// Estado de ticks
+				const sent = true;
+				const delivered = sentMessages[m._id]?.delivered || false;
+				const seen = sentMessages[m._id]?.seen || false;
+				if (seen) {
+					statusHtml = `<span class="msg-seen msg-seen-green" title="Visto">&#10003;&#10003;</span>`;
+				} else if (delivered) {
+					statusHtml = `<span class="msg-seen" title="Entregado">&#10003;&#10003;</span>`;
+				} else if (sent) {
+					statusHtml = `<span class="msg-sent" title="Enviado">&#10003;</span>`;
+				}
+			}
 			const div = document.createElement('div');
-			div.className = 'msg ' + (String(m.fromUserId) === String(currentUserId) ? 'user' : 'bot');
-			div.innerHTML = `<div>${escapeHtml(m.text)}</div><small>${new Date(m.createdAt).toLocaleString()}</small>`;
+			div.className = 'msg ' + (isUser ? 'user' : 'bot');
+			div.innerHTML = `<div>${escapeHtml(m.text)}</div><small>${new Date(m.createdAt).toLocaleString()}${statusHtml}</small>`;
 			chatWindow.appendChild(div);
 		});
 		chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -152,7 +175,25 @@
 			const r = await fetch(`${API_BASE}/api/messages?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`);
 			if (!r.ok) throw new Error('no history');
 			const list = await r.json();
+			// Reset status
+			sentMessages = {};
+			list.forEach(m => {
+				const isUser = String(m.fromUserId) === String(user1);
+				sentMessages[m._id] = { delivered: false, seen: false };
+				// Si el mensaje fue enviado por mí y el destinatario ya lo recibió (está en la lista), marcar como entregado
+				if (isUser && m._id) {
+					sentMessages[m._id].delivered = true;
+				}
+			});
 			renderMessages(list, user1);
+			// Marcar como leído el último mensaje recibido
+			const lastMsg = list.length ? list[list.length - 1] : null;
+			if (lastMsg && lastMsg.toUserId === user1 && lastMsg._id) {
+				lastReadMessageId = lastMsg._id;
+				if (window.socket) {
+					window.socket.emit('message:read', { fromUserId: lastMsg.fromUserId, toUserId: lastMsg.toUserId, messageId: lastMsg._id });
+				}
+			}
 		} catch (e) {
 			console.warn(e);
 			if (chatWindow) chatWindow.innerHTML = '<div class="note">No se pudo cargar el historial</div>';
@@ -173,80 +214,148 @@
 			}
 			if (!window.io) return;
 			if (!socket) socket = io(API_BASE);
+			window.socket = socket;
 			const cur = getCurrentUserId();
 			if (cur && socket) {
 				socket.emit('user:join', String(cur));
 				socket.off('message:created');
 				socket.on('message:created', m => {
-					// si la conversación abierta corresponde, mostrar; si no, aumentar unread
 					const curUser = getCurrentUserId();
 					if (selectedContactId && curUser && ((m.fromUserId === curUser && m.toUserId === selectedContactId) || (m.fromUserId === selectedContactId && m.toUserId === curUser))) {
-						// append to chatWindow
-						renderMessages((Array.from(chatWindow.querySelectorAll('.msg')) || []).concat([m]), curUser);
-						// mejor usar reload parcial: pedir nuevamente historial para consistencia
+						// Marcar como entregado si soy el remitente
+						if (String(m.fromUserId) === String(curUser) && m._id) {
+							sentMessages[m._id] = sentMessages[m._id] || {};
+							sentMessages[m._id].delivered = true;
+						}
 						loadMessages(curUser, selectedContactId);
 					} else {
-						// si el mensaje es para mi, y widget oculto, incrementar unread
 						if (m.toUserId === curUser && (!widget || widget.style.display === 'none')) {
 							unreadCount++;
 							updateBubbleBadge();
 						}
 					}
 				});
+				// NUEVO: presencia y typing
+				socket.on('presence:update', ({ userId, online, lastSeen }) => {
+					contactPresence[userId] = { online, lastSeen };
+					updateChatHeaderPresence();
+				});
+				socket.on('typing', ({ fromUserId, typing }) => {
+					if (selectedContactId && fromUserId === selectedContactId) {
+						typingIndicator = typing;
+						updateChatHeaderPresence();
+					}
+				});
+				socket.on('message:read', ({ fromUserId, toUserId, messageId }) => {
+					// Si yo soy el remitente y el destinatario es el contacto abierto, marcar como visto
+					const curUser = getCurrentUserId();
+					if (curUser && fromUserId === curUser && toUserId === selectedContactId) {
+						if (messageId) {
+							sentMessages[messageId] = sentMessages[messageId] || {};
+							sentMessages[messageId].seen = true;
+						}
+						loadMessages(curUser, selectedContactId);
+					}
+				});
 			}
 		} catch(e) { console.warn('socket fail', e); }
 	}
 
-	// enviar mensaje
-	async function sendMessage(from, to, text) {
-		try {
-			const r = await fetch(`${API_BASE}/api/messages`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ fromUserId: from, toUserId: to, text })
-			});
-			if (!r.ok) throw new Error('send failed');
-			const saved = await r.json();
-			// recargar historial brevemente
-			setTimeout(()=> loadMessages(from, to), 150);
-			return saved;
-		} catch (e) {
-			console.warn('send msg error', e);
-			throw e;
+	// NUEVO: actualizar header del chat con presencia y typing
+	function updateChatHeaderPresence() {
+		const curContact = selectedContactId;
+		const p = contactPresence[curContact] || {};
+		const label = chatUsernameLabel;
+		const typing = typingIndicator;
+		if (label) {
+			if (typing) {
+				label.textContent = 'Escribiendo...';
+				label.style.color = '#4f46e5';
+			} else if (p.online) {
+				label.textContent = 'En línea';
+				label.style.color = '#10b981';
+			} else if (p.lastSeen) {
+				const d = new Date(p.lastSeen);
+				label.textContent = 'Últ. vez: ' + d.toLocaleString();
+				label.style.color = '#888';
+			}
 		}
 	}
 
-	// eventos UI
-	createBubbleIfNeeded();
-	if (bubble) {
-		bubble.addEventListener('click', () => { showWidget(); });
-		bubble.style.display = widget && widget.style.display === 'block' ? 'none' : 'flex';
-	}
-	if (openChatBtn) openChatBtn.addEventListener('click', () => { showWidget(); });
-	if (chatCloseBtn) chatCloseBtn.addEventListener('click', () => { hideWidget(); });
-
-	if (chatForm) {
-		chatForm.addEventListener('submit', async (ev) => {
-			ev.preventDefault();
-			const from = getCurrentUserId();
-			// preferir selector claro del destinatario, si existe; si no, usar selectedContactId (compatibilidad)
+	// --- typing events ---
+	if (chatInput) {
+		chatInput.addEventListener('input', () => {
+			const cur = getCurrentUserId();
 			const to = (chatRecipientSelect && chatRecipientSelect.value) ? chatRecipientSelect.value : selectedContactId;
-			const txt = (chatInput && chatInput.value || '').trim();
-			if (!from) return alert('Selecciona un usuario en el login para enviar mensajes');
-			if (!to) return alert('Selecciona un contacto');
-			if (!txt) return;
-			try {
-				await sendMessage(from, to, txt);
-				if (chatInput) chatInput.value = '';
-			} catch(e){ alert('No se pudo enviar el mensaje'); }
+			if (!cur || !to) return;
+			if (!typingState) {
+				typingState = true;
+				if (window.socket) window.socket.emit('typing', { fromUserId: cur, toUserId: to, typing: true });
+			}
+			clearTimeout(lastTypingTimeout);
+			lastTypingTimeout = setTimeout(() => {
+				typingState = false;
+				if (window.socket) window.socket.emit('typing', { fromUserId: cur, toUserId: to, typing: false });
+			}, 1200);
 		});
 	}
+
+	// --- BEGIN: adapt viewport height & keyboard handling ---
+	function updateVhVar() {
+		try {
+			const height = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+			// set --vh as 1% of visual viewport in px units
+			document.documentElement.style.setProperty('--vh', (height * 0.01) + 'px');
+		} catch(e){ /* ignore */ }
+	}
+
+	// keep chat scrolled to bottom and ensure visibility when input receives focus
+	function onChatInputFocus() {
+		document.body.classList.add('keyboard-open');
+		// update vh and scroll after a short delay to let viewport settle
+		setTimeout(() => {
+			updateVhVar();
+			if (chatWindow) { chatWindow.scrollTop = chatWindow.scrollHeight; }
+			// also ensure widget visible
+			if (widget) widget.style.display = 'block';
+		}, 120);
+	}
+	function onChatInputBlur() {
+		// small delay to avoid flicker between focus changes
+		setTimeout(() => {
+			document.body.classList.remove('keyboard-open');
+			updateVhVar();
+		}, 160);
+	}
+
+	// attach viewport/keyboard listeners early
+	try {
+		updateVhVar();
+		// prefer visualViewport events when available (more accurate with virtual keyboard)
+		if (window.visualViewport) {
+			window.visualViewport.addEventListener('resize', updateVhVar);
+			window.visualViewport.addEventListener('scroll', updateVhVar);
+		}
+		window.addEventListener('resize', updateVhVar);
+		window.addEventListener('orientationchange', updateVhVar);
+		// focusin/out to detect when keyboard is likely open
+		window.addEventListener('focusin', (ev) => { if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) onChatInputFocus(); });
+		window.addEventListener('focusout', (ev) => { if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) onChatInputBlur(); });
+		// also attach directly to chat input if present
+		if (chatInput) {
+			chatInput.addEventListener('focus', onChatInputFocus);
+			chatInput.addEventListener('blur', onChatInputBlur);
+		}
+	} catch(e){ console.warn('viewport handlers init failed', e); }
+	// --- END: adapt viewport height & keyboard handling ---
 
 	// bootstrap inicial
 	(async function init(){
 		// asegurar estado inicial: widget oculto, bubble visible
 		if (widget) widget.style.display = 'none';
 		if (bubble) bubble.style.display = 'flex';
+		// actualizar variable vh al iniciar (por si el navegador ya tiene teclado o tamaños distintos)
+		updateVhVar();
 		await populateContacts();
 		await ensureSocketAndJoin();
 
@@ -257,3 +366,4 @@
 		}
 	})();
 })();
+
