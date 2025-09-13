@@ -28,12 +28,32 @@ body {
 	position: fixed;
 	inset: 0; /* top:0;right:0;bottom:0;left:0; */
 	width: 100vw;
-	height: 100vh;
+	/* usar la variable --vh calculada por JS para evitar problemas de teclado en móviles */
+	height: calc(var(--vh, 1vh) * 100);
 	max-width: none;
 	border-radius: 0;
 	box-shadow: none;
 	display:flex;
 	flex-direction:column;
+}
+
+/* Asegurar que la barra de entrada quede fija y siempre visible en full-screen */
+.chat-app.full-screen .chat-form {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: env(safe-area-inset-bottom, 0);
+	z-index: 30;
+	padding: 12px;
+	/* mantener el estilo visual existente */
+	background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.98));
+	box-shadow: 0 -4px 18px rgba(2,6,23,0.06);
+}
+
+/* evitar que la ventana de mensajes quede oculta por la barra de entrada */
+.chat-app.full-screen .chat-window {
+	/* ...existing properties... */
+	padding-bottom: calc(72px + env(safe-area-inset-bottom, 8px)); /* espacio para la barra fija */
 }
 
 .chat-header {
@@ -100,3 +120,4 @@ body {
 
 /* asegurar que ocupa todo el alto en standalone */
 .chat-app.full-screen { display:flex; flex-direction:column; }
+
