@@ -642,4 +642,31 @@ form input[type="number"]{width:140px}
 
 /* quick reply chips (por si más adelante se agregan) */
 .chat-window .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-.chat-window .chip { background:#fff;border:1px solid #e6e9ef;padding:6px 10px;border-radius:999px;font-size:0.9rem;cursor:pointer;box-shadow:0 6px 16px rgba(2,6,23,0.04); }
+.chat-window .chip { background:#fff;border:1px solid #e6e9ef;padding:6px 10px;border-radius:999px;font-size:0.9rem;cursor:pointer;box-shadow:0 6px 16px rgba(2,6,23,0.04);}
+
+/* Messenger-like chat enhancements */
+.msg-sent {
+	display: inline-block;
+	margin-left: 6px;
+	color: #aaa;
+	font-size: 0.95em;
+	vertical-align: middle;
+}
+.msg-seen {
+	display: inline-block;
+	margin-left: 6px;
+	color: #888;
+	font-size: 0.95em;
+	vertical-align: middle;
+}
+.msg-seen-blue {
+	color: #2196f3 !important;
+	font-weight: bold;
+}
+.msg-seen-green {
+	color: #10b981 !important;
+	font-weight: bold;
+}
+#chat-username {
+	transition: color 0.2s;
+}
