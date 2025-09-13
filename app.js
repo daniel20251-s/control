@@ -585,7 +585,12 @@ async function initAfterAuth() {
 			scheduledPayments.push(s);
 			renderScheduledList();
 		});
-		socket.on('scheduled:paid', data => { try { handleScheduledPaid(data); } catch(e){ console.warn(e);} });
+		socket.on('scheduled:paid', async data => {
+			try {
+				handleScheduledPaid(data);
+				await loadScheduledAndRender();
+			} catch(e){ console.warn(e); }
+		});
 		socket.on('scheduled:deleted', d => {
 			if (!d || !d.id) return;
 			scheduledPayments = scheduledPayments.filter(x => (x._id || x.id) !== d.id);
