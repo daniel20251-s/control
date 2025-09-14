@@ -556,129 +556,115 @@ form input[type="number"]{width:140px}
 	to { transform: translateY(0); opacity:1; }
 }
 .msg { animation: slideUpFade 240ms ease; }
-	#chat-widget {
-		right: 8px;
-		left: 8px;
-		bottom: 12px;
-		width: auto;
-		max-width: 100vw;
-		height: 80vh;
-		max-height: 96vh;
-		min-height: 220px;
-	}
-	#chat-recipient-select {
-		max-width: 80px;
-	}
+/* ===== ADICIONES: estilos faltantes/overrides ===== */
 
+/* Mostrar lápiz de cambio de foto únicamente dentro del chat-app (override de reglas globales que lo ocultan) */
+.chat-app .change-photo-btn {
+	display: inline-flex !important;
+	pointer-events: auto !important;
+	opacity: 1 !important;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	background: #fff;
+	border: 1px solid rgba(0,0,0,0.06);
+	box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+	z-index: 1200;
+}
 
-/* quick reply chips (por si más adelante se agregan) */
-.chat-window .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-.chat-window .chip { background:#fff;border:1px solid #e6e9ef;padding:6px 10px;border-radius:999px;font-size:0.9rem;cursor:pointer;box-shadow:0 6px 16px rgba(2,6,23,0.04);}
+/* avatar image inside avatar/author blocks */
+.avatar img,
+.header-avatar img,
+#auth-avatar img,
+#chat-user-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: inherit;
+	display: block;
+}
 
-/* Messenger-like chat enhancements */
-.msg-sent {
-	display: inline-block;
-	margin-left: 6px;
-	color: #aaa;
-	font-size: 0.95em;
+/* Modal para ver avatar ampliado (general, en caso styles.css se use para la versión standalone) */
+.avatar-modal {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0,0,0,0.6);
+	z-index: 99999;
+	padding: 24px;
+}
+.avatar-modal.hidden { display: none; }
+.avatar-modal img {
+	max-width: 92vw;
+	max-height: 92vh;
+	border-radius: 12px;
+	object-fit: contain;
+	box-shadow: 0 18px 50px rgba(2,6,23,0.6);
+	border: 4px solid rgba(255,255,255,0.06);
+}
+
+/* Mostrar con pequeña animación */
+.avatar-modal.show img { animation: zoomIn 220ms cubic-bezier(.2,.8,.2,1); }
+@keyframes zoomIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Botón eliminar mensaje (cuando se inserta en .msg-body) */
+.msg-delete {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	font-size: 14px;
+	margin-left: 8px;
+	padding: 4px;
+	color: #6b7280;
 	vertical-align: middle;
 }
-.msg-seen {
-	display: inline-block;
-	margin-left: 6px;
-	color: #888;
-	font-size: 0.95em;
-	vertical-align: middle;
-}
-.msg-seen-blue {
-	color: #2196f3 !important;
-	font-weight: bold;
-}
-.msg-seen-green {
-	color: #10b981 !important;
-	font-weight: bold;
-}
-#chat-username {
-	transition: color 0.2s;
-}
-.chat-window .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-.chat-window .chip { background:#fff;border:1px solid #e6e9ef;padding:6px 10px;border-radius:999px;font-size:0.9rem;cursor:pointer;box-shadow:0 6px 16px rgba(2,6,23,0.04);}
+.msg-delete:hover { color: #111; }
 
-/* Messenger-like chat enhancements */
-.msg-sent {
-	display: inline-block;
-	margin-left: 6px;
-	color: #aaa;
-	font-size: 0.95em;
-	vertical-align: middle;
+/* Contactos en el widget/chat (si existen) */
+.chat-contact {
+	display: block;
+	width: 100%;
+	text-align: left;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	color: #0f172a;
+	font-weight: 600;
 }
-.msg-seen {
-	display: inline-block;
-	margin-left: 6px;
-	color: #888;
-	font-size: 0.95em;
-	vertical-align: middle;
-}
-.msg-seen-blue {
-	color: #2196f3 !important;
-	font-weight: bold;
-}
-.msg-seen-green {
-	color: #10b981 !important;
-	font-weight: bold;
-}
-#chat-username {
-	transition: color 0.2s;
+.chat-contact.active {
+	background: rgba(79,70,229,0.06);
 }
 
-/* Animación de entrada de mensajes (definida correctamente) */
-@keyframes slideUpFade {
-	from { transform: translateY(8px); opacity:0; }
-	to { transform: translateY(0); opacity:1; }
-}
-.msg { animation: slideUpFade 240ms ease; }
-	#chat-widget {
-		right: 8px;
-		left: 8px;
-		bottom: 12px;
-		width: auto;
-		max-width: 100vw;
-		height: 80vh;
-		max-height: 96vh;
-		min-height: 220px;
-	}
-	#chat-recipient-select {
-		max-width: 80px;
-	}
-
-
-/* quick reply chips (por si más adelante se agregan) */
-.chat-window .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-.chat-window .chip { background:#fff;border:1px solid #e6e9ef;padding:6px 10px;border-radius:999px;font-size:0.9rem;cursor:pointer;box-shadow:0 6px 16px rgba(2,6,23,0.04);}
-
-/* Messenger-like chat enhancements */
-.msg-sent {
+/* Badge para pagos programados */
+.sched-badge {
 	display: inline-block;
-	margin-left: 6px;
-	color: #aaa;
-	font-size: 0.95em;
-	vertical-align: middle;
+	padding: 4px 8px;
+	margin-right: 8px;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	background: #eef2ff;
+	color: #1e293b;
 }
-.msg-seen {
-	display: inline-block;
-	margin-left: 6px;
-	color: #888;
-	font-size: 0.95em;
-	vertical-align: middle;
+.sched-badge.due { background: #fff4e6; color: #92400e; }
+.sched-badge.soon { background: #fff7ed; color: #92400e; }
+.sched-badge.normal { background: #eef2ff; color: #0f172a; }
+
+/* Pequeño ajuste para que los avatars con iniciales se centren bien */
+.header-avatar,
+#auth-avatar,
+#chat-user-avatar,
+.avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
 }
-.msg-seen-blue {
-	color: #2196f3 !important;
-	font-weight: bold;
-}
-.msg-seen-green {
-	color: #10b981 !important;
-	font-weight: bold;
-}
-#chat-username {
-	transition: color 0.2s;
-}
+
+/* Fin de adiciones */
