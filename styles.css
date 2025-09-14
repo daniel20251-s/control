@@ -285,9 +285,9 @@ form input[type="number"]{width:140px}
 
 /* avatar */
 .header-avatar {
-	width:44px;
-	height:44px;
-	border-radius:50%;
+	width:56px;
+	height:56px;
+	border-radius:12px;
 	object-fit:cover;
 	border:1px solid #e6e9ef;
 	background:#f3f4f6;
@@ -438,18 +438,18 @@ form input[type="number"]{width:140px}
 .header-avatar,
 #auth-avatar,
 #chat-user-avatar {
-	width:44px;
-	height:44px;
-	min-width:44px;
-	min-height:44px;
-	border-radius:50%;
+	width:56px;
+	height:56px;
+	min-width:56px;
+	min-height:56px;
+	border-radius:12px;
 	display:inline-flex;
 	align-items:center;
 	justify-content:center;
 	background:#eef2ff;
 	color:#0f172a;
 	font-weight:700;
-	font-size:1rem;
+	font-size:1.05rem;
 	border:1px solid #e6e9ef;
 	box-shadow: 0 2px 6px rgba(2,6,23,0.03);
 }
