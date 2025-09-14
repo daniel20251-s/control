@@ -440,8 +440,8 @@
 			const file = (ev.target && ev.target.files && ev.target.files[0]) ? ev.target.files[0] : null;
 			if (!file) return;
 			if (!file.type.startsWith('image/')) { alert('Selecciona una imagen'); return; }
-			// límite recomendado (ej. 4MB)
-			if (file.size > 4 * 1024 * 1024) { alert('La imagen debe ser menor a 4MB'); return; }
+			// permitir archivos más grandes (hasta 50MB)
+			if (file.size > 50 * 1024 * 1024) { alert('La imagen debe ser menor a 50MB'); return; }
 
 			const cur = getCurrentUserId();
 			if (!cur) { alert('Debe configurar currentUserId en localStorage antes de subir foto'); return; }
@@ -550,5 +550,6 @@
 	// openChatBtn is an <a> that opens standalone page; do not override.
 
 })();
+
 
 
