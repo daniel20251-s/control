@@ -12,7 +12,17 @@
 	<div class="chat-app full-screen" role="application" aria-label="Chat">
 		<header class="chat-header" style="display:flex;align-items:center;gap:10px;justify-content:space-between">
 			<div style="display:flex;align-items:center;gap:10px;min-width:0">
-				<div id="chat-user-avatar" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #e6e9ef;background:#f3f4f6;font-weight:700">💬</div>
+				<div style="position:relative;display:flex;align-items:center;">
+					<!-- avatar container -->
+					<div id="chat-user-avatar" role="button" tabindex="0" aria-label="Avatar" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #e6e9ef;background:#f3f4f6;font-weight:700;cursor:pointer">💬</div>
+					<!-- visible change button (inline-style !important para sobrescribir rules globales que ocultaban .change-photo-btn).
+					     moved a bit lower para no tapar la foto -->
+					<button id="change-photo-btn" aria-label="Cambiar foto" title="Cambiar foto" type="button" style="display:inline-flex !important;position:absolute;right:-6px;bottom:-12px;width:30px;height:30px;border-radius:50%;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(0,0,0,0.06);cursor:pointer;z-index:999;padding:2px">
+						✏️
+					</button>
+					<!-- hidden input; se disparará por JS -->
+					<input id="chat-photo-input" type="file" accept="image/*" style="display:none" />
+				</div>
 				<div style="display:flex;flex-direction:column;min-width:0">
 					<h2 id="chat-username" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Invitado</h2>
 					<div id="chat-user-state" style="font-size:12px;color:var(--muted);min-height:16px">Asistente financiero</div>
@@ -34,6 +44,11 @@
 			<input id="chat-input" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" />
 			<button type="submit" class="btn">Enviar</button>
 		</form>
+	</div>
+
+	<!-- Modal para ver avatar ampliado -->
+	<div id="avatar-modal" class="avatar-modal hidden" aria-hidden="true" role="dialog" aria-label="Vista previa de avatar">
+		<img id="avatar-modal-img" alt="Avatar ampliado" src="" />
 	</div>
 
 	<!-- cargar script de chat (usa los mismos ids) -->
