@@ -14,6 +14,14 @@
 	const chatUsernameLabel = $id('chat-username');
 	const chatRecipientSelect = $id('chat-recipient-select');
 
+	// NUEVAS referencias DOM para upload de foto
+	const changePhotoBtn = $id('change-photo-btn');
+	const chatPhotoInput = $id('chat-photo-input');
+
+	// NUEVAS referencias DOM para modal avatar
+	const avatarModal = $id('avatar-modal');
+	const avatarModalImg = $id('avatar-modal-img');
+
 	// estado
 	let socket = null;
 	let selectedContactId = null;
@@ -22,6 +30,9 @@
 	let lastTypingTimeout = null;
 	let typingState = false;
 	let sentMessages = {}; // { messageId: { delivered, seen } }
+
+	// NUEVO: cache de usuarios
+	let usersList = [];
 
 	// util
 	function getCurrentUserId(){ return localStorage.getItem('currentUserId') || ''; }
@@ -45,6 +56,8 @@
 		if (contactsCol) contactsCol.innerHTML = '';
 		if (chatRecipientSelect) chatRecipientSelect.innerHTML = '<option value="">Seleccionar contacto</option>';
 		const list = await fetchUsers();
+		// guardar lista para uso posterior
+		usersList = list || [];
 		list.forEach(u => {
 			if (contactsCol) {
 				const btn = document.createElement('button');
@@ -59,6 +72,8 @@
 					if (chatRecipientSelect) chatRecipientSelect.value = selectedContactId;
 					await loadMessages(getCurrentUserId(), selectedContactId);
 					if (chatUsernameLabel) chatUsernameLabel.textContent = u.username || 'Contacto';
+					// actualizar avatar del header según el contacto seleccionado (o usuario actual como fallback)
+					updateHeaderAvatarForSelectedContact();
 				});
 				contactsCol.appendChild(btn);
 			}
@@ -76,6 +91,8 @@
 				if (contactsCol) Array.from(contactsCol.children).forEach(c => c.classList.toggle('active', c.dataset.id === selectedContactId));
 				if (selectedContactId) await loadMessages(getCurrentUserId(), selectedContactId);
 				updateChatHeaderPresence();
+				// actualizar avatar del header según el contacto seleccionado (o usuario actual como fallback)
+				updateHeaderAvatarForSelectedContact();
 			});
 			// choose first by default
 			if (!selectedContactId && chatRecipientSelect.options.length > 1) {
@@ -87,8 +104,49 @@
 		// set header avatar/name for current user if present
 		const curId = getCurrentUserId();
 		if (curId && chatUserAvatar) {
-			const me = (await fetchUsers()).find(x => (x._id||x.id) == curId);
-			if (me) chatUserAvatar.textContent = (me.username||'U').split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase();
+			// usamos la lista ya obtenida (evita otra petición)
+			const me = list.find(x => (x._id||x.id) == curId);
+			if (me) {
+				// si tiene photoUrl, mostrar <img>, si no mostrar iniciales
+				if (me.photoUrl) {
+					const src = (me.photoUrl.indexOf('http') === 0) ? me.photoUrl : (API_BASE + me.photoUrl);
+					chatUserAvatar.innerHTML = `<img src="${src}" alt="avatar" />`;
+				} else {
+					chatUserAvatar.textContent = (me.username||'U').split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase();
+				}
+			}
+		}
+		// actualizar avatar del header según el contacto seleccionado (o usuario actual como fallback)
+		updateHeaderAvatarForSelectedContact();
+	}
+
+	// Mostrar la foto/iniciales del contacto seleccionado (o del usuario actual si no hay seleccionado).
+	function updateHeaderAvatarForSelectedContact() {
+		const curId = getCurrentUserId();
+		let target = null;
+		if (selectedContactId) {
+			target = usersList.find(u => (u._id || u.id) == selectedContactId) || null;
+		}
+		// si no hay seleccionado, mostrar al usuario actual (si existe)
+		if (!target && curId) {
+			target = usersList.find(u => (u._id || u.id) == curId) || null;
+		}
+		if (chatUserAvatar) {
+			if (target && target.photoUrl) {
+				const src = (target.photoUrl.indexOf('http') === 0) ? target.photoUrl : (API_BASE + target.photoUrl);
+				chatUserAvatar.innerHTML = `<img src="${src}" alt="avatar" />`;
+			} else if (target && target.username) {
+				chatUserAvatar.innerHTML = ''; // limpiar antes de poner texto
+				chatUserAvatar.textContent = (target.username || 'U').split(' ').map(s => s[0]).slice(0,2).join('').toUpperCase();
+			} else {
+				chatUserAvatar.innerHTML = '💬';
+			}
+		}
+		// Mostrar el botón de cambiar foto sólo cuando el avatar mostrado es el del usuario actual
+		if (changePhotoBtn) {
+			if (curId && selectedContactId && String(selectedContactId) === String(curId)) changePhotoBtn.style.display = 'inline-flex';
+			else if (!selectedContactId && curId) changePhotoBtn.style.display = 'inline-flex';
+			else changePhotoBtn.style.display = 'none';
 		}
 	}
 
@@ -238,6 +296,11 @@
 						loadMessages(curUser, selectedContactId);
 					}
 				});
+				// actualizar contactos cuando un usuario se registra/actualiza (por ejemplo subida de foto)
+				socket.off('user:registered');
+				socket.on('user:registered', async (u) => {
+					try { await populateContacts(); } catch(e){ console.warn('refresh contacts after user:registered', e); }
+				});
 				socket.on('presence:update', ({ userId, online, lastSeen }) => {
 					contactPresence[userId] = { online, lastSeen };
 					updateChatHeaderPresence();
@@ -367,6 +430,90 @@
 		});
 	}
 
+	// Upload de foto: abrir selector y subir
+	if (changePhotoBtn && chatPhotoInput) {
+		changePhotoBtn.addEventListener('click', (ev) => {
+			ev.preventDefault();
+			chatPhotoInput.click();
+		});
+		chatPhotoInput.addEventListener('change', async (ev) => {
+			const file = (ev.target && ev.target.files && ev.target.files[0]) ? ev.target.files[0] : null;
+			if (!file) return;
+			if (!file.type.startsWith('image/')) { alert('Selecciona una imagen'); return; }
+			// límite recomendado (ej. 4MB)
+			if (file.size > 4 * 1024 * 1024) { alert('La imagen debe ser menor a 4MB'); return; }
+
+			const cur = getCurrentUserId();
+			if (!cur) { alert('Debe configurar currentUserId en localStorage antes de subir foto'); return; }
+
+			try {
+				changePhotoBtn.disabled = true;
+				// leer como dataURL
+				const dataUrl = await new Promise((resolve, reject) => {
+					const r = new FileReader();
+					r.onload = () => resolve(r.result);
+					r.onerror = () => reject(new Error('file read error'));
+					r.readAsDataURL(file);
+				});
+				const r = await fetch(`${API_BASE}/api/users/${encodeURIComponent(cur)}/photo`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ dataUrl })
+				});
+				if (!r.ok) {
+					const body = await r.json().catch(()=>({}));
+					throw new Error(body && body.error ? body.error : 'upload failed');
+				}
+				const updated = await r.json();
+				// actualizar avatar en UI (usar photoUrl retornado)
+				if (updated && updated.photoUrl) {
+					const src = (updated.photoUrl.indexOf('http') === 0) ? updated.photoUrl : (API_BASE + updated.photoUrl);
+					if (chatUserAvatar) chatUserAvatar.innerHTML = `<img src="${src}" alt="avatar" />`;
+				}
+				// refrescar contactos para que otros cambios se reflejen
+				await populateContacts();
+			} catch (err) {
+				console.warn('upload avatar failed', err);
+				alert('No se pudo subir la foto.');
+			} finally {
+				changePhotoBtn.disabled = false;
+				chatPhotoInput.value = '';
+			}
+		});
+	}
+
+	// Abrir modal al clicar el avatar (si contiene <img>)
+	if (chatUserAvatar && avatarModal && avatarModalImg) {
+		function openAvatarModal() {
+			const img = chatUserAvatar.querySelector('img');
+			if (!img || !img.src) return;
+			avatarModalImg.src = img.src;
+			avatarModal.classList.remove('hidden');
+			avatarModal.classList.add('show');
+			avatarModal.setAttribute('aria-hidden', 'false');
+		}
+		function closeAvatarModal() {
+			avatarModal.classList.add('hidden');
+			avatarModal.classList.remove('show');
+			avatarModal.setAttribute('aria-hidden', 'true');
+			avatarModalImg.src = '';
+		}
+
+		chatUserAvatar.addEventListener('click', openAvatarModal);
+		chatUserAvatar.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openAvatarModal(); } });
+
+		// Cerrar al clicar fuera de la imagen (overlay) o con ESC
+		avatarModal.addEventListener('click', (ev) => {
+			// si se clicó fuera de la imagen -> cerrar
+			if (ev.target === avatarModal || ev.target === avatarModalImg) {
+				// si clic en la imagen, no cerrar (clic en fondo sí)
+				if (ev.target === avatarModal) closeAvatarModal();
+			}
+		});
+		// cerrar con ESC
+		window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && avatarModal && !avatarModal.classList.contains('hidden')) closeAvatarModal(); });
+	}
+
 	// viewport / keyboard handling
 	function updateVhVar(){
 		try {
@@ -392,7 +539,10 @@
 		updateVhVar();
 		await populateContacts();
 		await ensureSocketAndJoin();
-		if (chatRecipientSelect && chatRecipientSelect.value) selectedContactId = chatRecipientSelect.value;
+		if (chatRecipientSelect && chatRecipientSelect.value) {
+			selectedContactId = chatRecipientSelect.value;
+			updateHeaderAvatarForSelectedContact();
+		}
 	})();
 
 	// handlers
@@ -400,3 +550,5 @@
 	// openChatBtn is an <a> that opens standalone page; do not override.
 
 })();
+
+
