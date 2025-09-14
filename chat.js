@@ -165,13 +165,23 @@
 			const r = await fetch(`${API_BASE}/api/messages?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`);
 			if (!r.ok) throw new Error('no history');
 			const list = await r.json();
-			// reset sentMessages and mark delivered for outgoing in history
-			sentMessages = {};
+
+			// preserve previous sentMessages state (so "seen" / delivery flags survive refresh)
+			const prev = sentMessages || {};
+			const nextState = {};
 			list.forEach(m => {
 				const isUser = String(m.fromUserId) === String(user1);
-				sentMessages[m._id] = { delivered: !!isUser, seen: false };
+				const old = prev[m._id] || {};
+				nextState[m._id] = {
+					// si existía, respetar; si no, marcar entregado para mensajes propios
+					delivered: (typeof old.delivered !== 'undefined') ? old.delivered : !!isUser,
+					seen: !!old.seen
+				};
 			});
+			sentMessages = nextState;
+
 			renderMessages(list, user1);
+
 			// mark last received as read
 			const lastMsg = list.length ? list[list.length - 1] : null;
 			if (lastMsg && lastMsg.toUserId === user1 && lastMsg._id && window.socket) {
