@@ -65,9 +65,9 @@ body {
 	border-bottom: 1px solid #f0f2f5;
 }
 #chat-user-avatar {
-	width:48px;
-	height:48px;
-	border-radius:10px;
+	width:56px;
+	height:56px;
+	border-radius:12px;
 	background: linear-gradient(180deg,#eef2ff,#fff);
 	display:flex;
 	align-items:center;
@@ -175,5 +175,4 @@ body {
 	from { transform: scale(0.92); opacity: 0; }
 	to { transform: scale(1); opacity: 1; }
 }
-
 
