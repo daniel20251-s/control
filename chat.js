@@ -109,8 +109,8 @@
 			const div = document.createElement('div');
 			div.className = 'msg ' + (isUser ? 'user' : 'bot');
 			div.dataset.id = m._id;
-			// contenido principal
-			div.innerHTML = `<div class="msg-body">${escapeHtml(m.text)}</div><small>${new Date(m.createdAt).toLocaleString()} ${statusHtml}</small>`;
+			// contenido principal: separar timestamp y estado para poder actualizarlos luego
+			div.innerHTML = `<div class="msg-body">${escapeHtml(m.text)}</div><small><span class="msg-timestamp">${new Date(m.createdAt).toLocaleString()}</span> <span class="msg-status">${statusHtml}</span></small>`;
 			// si es mensaje propio, añadir botón eliminar
 			if (isUser) {
 				const delBtn = document.createElement('button');
@@ -145,6 +145,21 @@
 			chatWindow.appendChild(div);
 		});
 		chatWindow.scrollTop = chatWindow.scrollHeight;
+	}
+
+	// utilidad: actualizar el status visual (entregado/visto) de un mensaje específico en el DOM
+	function updateSentMessageStatusInUI(messageId) {
+		if (!chatWindow || !messageId) return;
+		const el = chatWindow.querySelector(`[data-id="${messageId}"]`);
+		if (!el) return;
+		const statusContainer = el.querySelector('.msg-status');
+		if (!statusContainer) return;
+		const st = sentMessages[messageId] || {};
+		let statusHtml = '';
+		if (st.seen) statusHtml = `<span class="msg-seen msg-seen-green" title="Visto">&#10003;&#10003;</span>`;
+		else if (st.delivered) statusHtml = `<span class="msg-seen" title="Entregado">&#10003;&#10003;</span>`;
+		else statusHtml = `<span class="msg-sent" title="Enviado">&#10003;</span>`;
+		statusContainer.innerHTML = statusHtml;
 	}
 
 	// utilidad: eliminar mensaje del DOM si existe
@@ -217,6 +232,8 @@
 						if (String(m.fromUserId) === String(curUser) && m._id) {
 							sentMessages[m._id] = sentMessages[m._id] || {};
 							sentMessages[m._id].delivered = true;
+							// actualizar UI si el mensaje ya está en DOM
+							updateSentMessageStatusInUI(m._id);
 						}
 						loadMessages(curUser, selectedContactId);
 					}
@@ -233,10 +250,16 @@
 				});
 				socket.on('message:read', ({ fromUserId, toUserId, messageId }) => {
 					const curUser = getCurrentUserId();
-					if (curUser && fromUserId === curUser && toUserId === selectedContactId && messageId) {
+					// marcar seen siempre que el evento llegue (y actualizar UI si existe)
+					if (messageId) {
 						sentMessages[messageId] = sentMessages[messageId] || {};
 						sentMessages[messageId].seen = true;
-						loadMessages(curUser, selectedContactId);
+						// actualizar DOM directamente (si el mensaje está visible)
+						updateSentMessageStatusInUI(messageId);
+						// además, si corresponde a la conversación abierta, recargar historial para mantener consistencia
+						if (curUser && toUserId === curUser && selectedContactId && fromUserId === selectedContactId) {
+							loadMessages(curUser, selectedContactId);
+						}
 					}
 				});
 				// añadir listener para eliminación
